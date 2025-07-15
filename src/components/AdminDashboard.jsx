@@ -189,13 +189,13 @@ const AdminDashboard = () => {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-white">Selamat datang, {user.username}</span>
-              <button
+              {/* <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Keluar</span>
-              </button>
+              </button> */}
             </div>
           </div>
         </div>
