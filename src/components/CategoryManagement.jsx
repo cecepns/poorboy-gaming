@@ -6,6 +6,7 @@ import Pagination from './Pagination';
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -26,13 +27,31 @@ const CategoryManagement = () => {
     is_active: true
   });
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchCategories();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearchTerm]);
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`/admin/categories?page=${currentPage}&limit=20`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20'
+      });
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+      
+      const response = await axios.get(`/admin/categories?${params}`);
       setCategories(response.data.data || []);
       setPagination(response.data.pagination);
     } catch (error) {
@@ -41,12 +60,13 @@ const CategoryManagement = () => {
     }
   };
 
-  const filteredCategories = Array.isArray(categories) ? categories.filter(category =>
-    category.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
-
   const handlePageChange = (page) => {
     setCurrentPage(page);
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleEdit = (category) => {
@@ -143,14 +163,14 @@ const CategoryManagement = () => {
           type="text"
           placeholder="Cari kategori..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearch}
           className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
         />
       </div>
 
       {/* Categories Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredCategories.map((category) => (
+        {categories.map((category) => (
           <div key={category.id} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:bg-white/15 transition-all">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -209,7 +229,7 @@ const CategoryManagement = () => {
       />
 
       {/* Empty State */}
-      {filteredCategories.length === 0 && (
+      {categories.length === 0 && (
         <div className="text-center py-12">
           <Tag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-300 mb-2">Tidak Ada Kategori Ditemukan</h3>

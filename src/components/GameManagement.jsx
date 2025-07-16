@@ -133,6 +133,7 @@ const GameManagement = ({ onStatsUpdate }) => {
   const [games, setGames] = useState([]);
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingGame, setEditingGame] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -154,14 +155,32 @@ const GameManagement = ({ onStatsUpdate }) => {
   });
   const [showPassword, setShowPassword] = useState(false);
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchGames();
     fetchCategories();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearchTerm]);
 
   const fetchGames = async () => {
     try {
-      const response = await axios.get(`/admin/games?page=${currentPage}&limit=20`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20'
+      });
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+      
+      const response = await axios.get(`/admin/games?${params}`);
       setGames(response.data.data);
       setPagination(response.data.pagination);
       if (onStatsUpdate) onStatsUpdate();
@@ -182,12 +201,13 @@ const GameManagement = ({ onStatsUpdate }) => {
     }
   };
 
-  const filteredGames = games.filter(game =>
-    game.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const handlePageChange = (page) => {
     setCurrentPage(page);
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleEdit = (game) => {
@@ -268,14 +288,14 @@ const GameManagement = ({ onStatsUpdate }) => {
           type="text"
           placeholder="Cari game..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearch}
           className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
         />
       </div>
 
       {/* Games Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredGames.map((game) => (
+        {games.map((game) => (
           <div key={game.id} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl overflow-hidden hover:bg-white/15 transition-all duration-300 transform hover:-translate-y-1">
             <div className="aspect-video bg-gradient-to-br from-purple-600 to-pink-600 relative overflow-hidden">
               {game.image_url ? (
@@ -356,7 +376,7 @@ const GameManagement = ({ onStatsUpdate }) => {
       />
 
       {/* Empty State */}
-      {filteredGames.length === 0 && (
+      {games.length === 0 && (
         <div className="text-center py-12">
           <GamepadIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-300 mb-2">Tidak Ada Game Ditemukan</h3>

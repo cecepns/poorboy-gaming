@@ -6,6 +6,7 @@ import Pagination from './Pagination';
 const UserManagement = ({ onStatsUpdate }) => {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -26,13 +27,31 @@ const UserManagement = ({ onStatsUpdate }) => {
     is_active: true
   });
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchUsers();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearchTerm]);
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`/admin/users?page=${currentPage}&limit=20`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20'
+      });
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+      
+      const response = await axios.get(`/admin/users?${params}`);
       setUsers(response.data.data);
       setPagination(response.data.pagination);
       if (onStatsUpdate) onStatsUpdate();
@@ -41,13 +60,13 @@ const UserManagement = ({ onStatsUpdate }) => {
     }
   };
 
-  const filteredUsers = users.filter(user =>
-    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const handlePageChange = (page) => {
     setCurrentPage(page);
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleEdit = (user) => {
@@ -137,7 +156,7 @@ const UserManagement = ({ onStatsUpdate }) => {
           type="text"
           placeholder="Cari pengguna..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearch}
           className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
         />
       </div>
@@ -156,7 +175,7 @@ const UserManagement = ({ onStatsUpdate }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <tr key={user.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">

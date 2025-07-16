@@ -6,6 +6,7 @@ import Pagination from './Pagination';
 const ReportManagement = () => {
   const [reports, setReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
@@ -24,13 +25,35 @@ const ReportManagement = () => {
     admin_notes: ''
   });
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchReports();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearchTerm, statusFilter]);
 
   const fetchReports = async () => {
     try {
-      const response = await axios.get(`/admin/reports?page=${currentPage}&limit=20`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20'
+      });
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+      
+      if (statusFilter && statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+      
+      const response = await axios.get(`/admin/reports?${params}`);
       setReports(response.data.data);
       setPagination(response.data.pagination);
     } catch (error) {
@@ -38,16 +61,18 @@ const ReportManagement = () => {
     }
   };
 
-  const filteredReports = reports.filter(report => {
-    const matchesSearch = report.game_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         report.user_username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         report.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
   const handlePageChange = (page) => {
     setCurrentPage(page);
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleStatusFilter = (e) => {
+    setStatusFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page when filtering
   };
 
   const handleUpdateReport = (report) => {
@@ -161,13 +186,13 @@ const ReportManagement = () => {
             type="text"
             placeholder="Cari laporan..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearch}
             className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={handleStatusFilter}
           className="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
         >
           <option value="all">Semua Status</option>
@@ -180,7 +205,7 @@ const ReportManagement = () => {
 
       {/* Reports List */}
       <div className="space-y-4">
-        {filteredReports.map((report) => (
+        {reports.map((report) => (
           <div key={report.id} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:bg-white/15 transition-all">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -253,7 +278,7 @@ const ReportManagement = () => {
       />
 
       {/* Empty State */}
-      {filteredReports.length === 0 && (
+      {reports.length === 0 && (
         <div className="text-center py-12">
           <AlertTriangle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-300 mb-2">Tidak Ada Laporan Ditemukan</h3>

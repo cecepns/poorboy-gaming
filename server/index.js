@@ -72,7 +72,7 @@ const decryptGameToken = (encryptedToken) => {
 // Routes
 
 // Auth routes
-app.post('/api/auth/login', async (req, res) => {
+app.post('/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -119,7 +119,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/auth/register', async (req, res) => {
   try {
     const { username, email, password, plan_id } = req.body;
 
@@ -169,7 +169,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // Subscription plans routes
-app.get('/api/subscription-plans', async (req, res) => {
+app.get('/subscription-plans', async (req, res) => {
   try {
     const [plans] = await pool.execute(
       'SELECT * FROM subscription_plans WHERE is_active = TRUE ORDER BY duration_days ASC'
@@ -180,20 +180,39 @@ app.get('/api/subscription-plans', async (req, res) => {
   }
 });
 
-app.get('/api/admin/subscription-plans', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/admin/subscription-plans', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    
+    let whereClause = '';
+    let countWhereClause = '';
+    let params = [];
+    let countParams = [];
+    
+    if (search) {
+      whereClause = 'WHERE name LIKE ? OR currency LIKE ?';
+      countWhereClause = 'WHERE name LIKE ? OR currency LIKE ?';
+      const searchParam = `%${search}%`;
+      params = [searchParam, searchParam, limit, offset];
+      countParams = [searchParam, searchParam];
+    } else {
+      params = [limit, offset];
+    }
     
     // Get total count
-    const [countResult] = await pool.execute('SELECT COUNT(*) as total FROM subscription_plans');
+    const [countResult] = await pool.execute(
+      `SELECT COUNT(*) as total FROM subscription_plans ${countWhereClause}`,
+      countParams
+    );
     const total = countResult[0].total;
     
     // Get paginated data
     const [plans] = await pool.execute(
-      'SELECT * FROM subscription_plans ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
+      `SELECT * FROM subscription_plans ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      params
     );
     
     res.json({
@@ -212,7 +231,7 @@ app.get('/api/admin/subscription-plans', authenticateToken, requireAdmin, async 
   }
 });
 
-app.post('/api/admin/subscription-plans', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/admin/subscription-plans', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, duration_days, price, currency, is_active } = req.body;
     
@@ -227,7 +246,7 @@ app.post('/api/admin/subscription-plans', authenticateToken, requireAdmin, async
   }
 });
 
-app.put('/api/admin/subscription-plans/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/admin/subscription-plans/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, duration_days, price, currency, is_active } = req.body;
@@ -243,7 +262,7 @@ app.put('/api/admin/subscription-plans/:id', authenticateToken, requireAdmin, as
   }
 });
 
-app.delete('/api/admin/subscription-plans/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/admin/subscription-plans/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -255,22 +274,39 @@ app.delete('/api/admin/subscription-plans/:id', authenticateToken, requireAdmin,
 });
 
 // User management routes
-app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/admin/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    
+    let whereClause = 'WHERE role = "user"';
+    let countWhereClause = 'WHERE role = "user"';
+    let params = [];
+    let countParams = [];
+    
+    if (search) {
+      whereClause += ' AND (username LIKE ? OR email LIKE ?)';
+      countWhereClause += ' AND (username LIKE ? OR email LIKE ?)';
+      const searchParam = `%${search}%`;
+      params = [searchParam, searchParam, limit, offset];
+      countParams = [searchParam, searchParam];
+    } else {
+      params = [limit, offset];
+    }
     
     // Get total count
     const [countResult] = await pool.execute(
-      'SELECT COUNT(*) as total FROM users WHERE role = "user"'
+      `SELECT COUNT(*) as total FROM users ${countWhereClause}`,
+      countParams
     );
     const total = countResult[0].total;
     
     // Get paginated data
     const [users] = await pool.execute(
-      'SELECT id, username, email, role, subscription_expiry, is_active, created_at FROM users WHERE role = "user" ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
+      `SELECT id, username, email, role, subscription_expiry, is_active, created_at FROM users ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      params
     );
     
     res.json({
@@ -289,7 +325,7 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
-app.post('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/admin/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { username, email, password, subscription_expiry, is_active } = req.body;
     
@@ -306,7 +342,7 @@ app.post('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =
   }
 });
 
-app.put('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { username, email, password, subscription_expiry, is_active } = req.body;
@@ -330,7 +366,7 @@ app.put('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res
   }
 });
 
-app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -341,7 +377,7 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
   }
 });
 
-app.post('/api/admin/users/:id/extend-subscription', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/admin/users/:id/extend-subscription', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { days } = req.body;
@@ -368,20 +404,39 @@ app.post('/api/admin/users/:id/extend-subscription', authenticateToken, requireA
 });
 
 // Game management routes
-app.get('/api/admin/games', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/admin/games', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    
+    let whereClause = '';
+    let countWhereClause = '';
+    let params = [];
+    let countParams = [];
+    
+    if (search) {
+      whereClause = 'WHERE g.name LIKE ? OR c.name LIKE ?';
+      countWhereClause = 'WHERE g.name LIKE ? OR c.name LIKE ?';
+      const searchParam = `%${search}%`;
+      params = [searchParam, searchParam, limit, offset];
+      countParams = [searchParam, searchParam];
+    } else {
+      params = [limit, offset];
+    }
     
     // Get total count
-    const [countResult] = await pool.execute('SELECT COUNT(*) as total FROM games');
+    const [countResult] = await pool.execute(
+      `SELECT COUNT(*) as total FROM games g LEFT JOIN game_categories c ON g.category_id = c.id ${countWhereClause}`,
+      countParams
+    );
     const total = countResult[0].total;
     
     // Get paginated data
     const [games] = await pool.execute(
-      'SELECT g.*, c.name as category_name, c.color as category_color FROM games g LEFT JOIN game_categories c ON g.category_id = c.id ORDER BY g.created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
+      `SELECT g.*, c.name as category_name, c.color as category_color FROM games g LEFT JOIN game_categories c ON g.category_id = c.id ${whereClause} ORDER BY g.created_at DESC LIMIT ? OFFSET ?`,
+      params
     );
     
     res.json({
@@ -400,7 +455,7 @@ app.get('/api/admin/games', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
-app.post('/api/admin/games', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/admin/games', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, image_url, username, password, category_id } = req.body;
     
@@ -415,7 +470,7 @@ app.post('/api/admin/games', authenticateToken, requireAdmin, async (req, res) =
   }
 });
 
-app.put('/api/admin/games/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/admin/games/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, image_url, username, password, category_id } = req.body;
@@ -431,7 +486,7 @@ app.put('/api/admin/games/:id', authenticateToken, requireAdmin, async (req, res
   }
 });
 
-app.delete('/api/admin/games/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/admin/games/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -443,20 +498,39 @@ app.delete('/api/admin/games/:id', authenticateToken, requireAdmin, async (req, 
 });
 
 // Category management routes
-app.get('/api/admin/categories', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/admin/categories', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    
+    let whereClause = '';
+    let countWhereClause = '';
+    let params = [];
+    let countParams = [];
+    
+    if (search) {
+      whereClause = 'WHERE name LIKE ? OR description LIKE ?';
+      countWhereClause = 'WHERE name LIKE ? OR description LIKE ?';
+      const searchParam = `%${search}%`;
+      params = [searchParam, searchParam, limit, offset];
+      countParams = [searchParam, searchParam];
+    } else {
+      params = [limit, offset];
+    }
     
     // Get total count
-    const [countResult] = await pool.execute('SELECT COUNT(*) as total FROM game_categories');
+    const [countResult] = await pool.execute(
+      `SELECT COUNT(*) as total FROM game_categories ${countWhereClause}`,
+      countParams
+    );
     const total = countResult[0].total;
     
     // Get paginated data
     const [categories] = await pool.execute(
-      'SELECT * FROM game_categories ORDER BY sort_order ASC, name ASC LIMIT ? OFFSET ?',
-      [limit, offset]
+      `SELECT * FROM game_categories ${whereClause} ORDER BY sort_order ASC, name ASC LIMIT ? OFFSET ?`,
+      params
     );
     
     res.json({
@@ -475,7 +549,7 @@ app.get('/api/admin/categories', authenticateToken, requireAdmin, async (req, re
   }
 });
 
-app.post('/api/admin/categories', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/admin/categories', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, description, color, icon, is_active } = req.body;
     
@@ -490,7 +564,7 @@ app.post('/api/admin/categories', authenticateToken, requireAdmin, async (req, r
   }
 });
 
-app.put('/api/admin/categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/admin/categories/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, color, icon, is_active } = req.body;
@@ -506,7 +580,7 @@ app.put('/api/admin/categories/:id', authenticateToken, requireAdmin, async (req
   }
 });
 
-app.delete('/api/admin/categories/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/admin/categories/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -525,14 +599,52 @@ app.delete('/api/admin/categories/:id', authenticateToken, requireAdmin, async (
 });
 
 // Game reports routes
-app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/admin/reports', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    const status = req.query.status || '';
+    
+    let whereClause = '';
+    let countWhereClause = '';
+    let params = [];
+    let countParams = [];
+    
+    if (search || status) {
+      whereClause = 'WHERE';
+      countWhereClause = 'WHERE';
+      const conditions = [];
+      
+      if (search) {
+        conditions.push('(g.name LIKE ? OR u.username LIKE ? OR r.title LIKE ?)');
+        const searchParam = `%${search}%`;
+        params.push(searchParam, searchParam, searchParam);
+        countParams.push(searchParam, searchParam, searchParam);
+      }
+      
+      if (status && status !== 'all') {
+        conditions.push('r.status = ?');
+        params.push(status);
+        countParams.push(status);
+      }
+      
+      whereClause += ' ' + conditions.join(' AND ');
+      countWhereClause += ' ' + conditions.join(' AND ');
+    }
+    
+    params.push(limit, offset);
     
     // Get total count
-    const [countResult] = await pool.execute('SELECT COUNT(*) as total FROM game_reports');
+    const [countResult] = await pool.execute(`
+      SELECT COUNT(*) as total 
+      FROM game_reports r
+      JOIN games g ON r.game_id = g.id
+      JOIN users u ON r.user_id = u.id
+      LEFT JOIN users a ON r.resolved_by = a.id
+      ${countWhereClause}
+    `, countParams);
     const total = countResult[0].total;
     
     // Get paginated data
@@ -543,9 +655,10 @@ app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) 
       JOIN games g ON r.game_id = g.id
       JOIN users u ON r.user_id = u.id
       LEFT JOIN users a ON r.resolved_by = a.id
+      ${whereClause}
       ORDER BY r.created_at DESC
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `, params);
     
     res.json({
       data: reports,
@@ -563,7 +676,7 @@ app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
-app.put('/api/admin/reports/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/admin/reports/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, admin_notes } = req.body;
@@ -586,7 +699,7 @@ app.put('/api/admin/reports/:id', authenticateToken, requireAdmin, async (req, r
   }
 });
 
-app.delete('/api/admin/reports/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/admin/reports/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -598,7 +711,7 @@ app.delete('/api/admin/reports/:id', authenticateToken, requireAdmin, async (req
 });
 
 // User game access routes
-app.get('/api/user/games', authenticateToken, async (req, res) => {
+app.get('/user/games', authenticateToken, async (req, res) => {
   try {
     // Check if user subscription is still valid
     const [users] = await pool.execute(
@@ -618,9 +731,43 @@ app.get('/api/user/games', authenticateToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    const category = req.query.category || '';
+    
+    let whereClause = '';
+    let countWhereClause = '';
+    let params = [];
+    let countParams = [];
+    
+    if (search || category) {
+      whereClause = 'WHERE';
+      countWhereClause = 'WHERE';
+      const conditions = [];
+      
+      if (search) {
+        conditions.push('g.name LIKE ?');
+        const searchParam = `%${search}%`;
+        params.push(searchParam);
+        countParams.push(searchParam);
+      }
+      
+      if (category) {
+        conditions.push('c.name = ?');
+        params.push(category);
+        countParams.push(category);
+      }
+      
+      whereClause += ' ' + conditions.join(' AND ');
+      countWhereClause += ' ' + conditions.join(' AND ');
+    }
+    
+    params.push(limit, offset);
     
     // Get total count
-    const [countResult] = await pool.execute('SELECT COUNT(*) as total FROM games');
+    const [countResult] = await pool.execute(
+      `SELECT COUNT(*) as total FROM games g LEFT JOIN game_categories c ON g.category_id = c.id ${countWhereClause}`,
+      countParams
+    );
     const total = countResult[0].total;
     
     // Get paginated data with category info
@@ -628,9 +775,10 @@ app.get('/api/user/games', authenticateToken, async (req, res) => {
       `SELECT g.id, g.name, g.image_url, c.name as category_name, c.color as category_color
        FROM games g
        LEFT JOIN game_categories c ON g.category_id = c.id
+       ${whereClause}
        ORDER BY g.name ASC
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      params
     );
     
     res.json({
@@ -649,7 +797,7 @@ app.get('/api/user/games', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/user/games/:id/token', authenticateToken, async (req, res) => {
+app.get('/user/games/:id/token', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -692,7 +840,7 @@ app.get('/api/user/games/:id/token', authenticateToken, async (req, res) => {
 });
 
 // User game report routes
-app.post('/api/user/games/:id/report', authenticateToken, async (req, res) => {
+app.post('/user/games/:id/report', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { report_type, title, description } = req.body;
@@ -734,17 +882,45 @@ app.post('/api/user/games/:id/report', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/user/reports', authenticateToken, async (req, res) => {
+app.get('/user/reports', authenticateToken, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    const status = req.query.status || '';
+    
+    let whereClause = 'WHERE r.user_id = ?';
+    let countWhereClause = 'WHERE r.user_id = ?';
+    let params = [req.user.id];
+    let countParams = [req.user.id];
+    
+    if (search || status) {
+      if (search) {
+        whereClause += ' AND (g.name LIKE ? OR r.title LIKE ?)';
+        countWhereClause += ' AND (g.name LIKE ? OR r.title LIKE ?)';
+        const searchParam = `%${search}%`;
+        params.push(searchParam, searchParam);
+        countParams.push(searchParam, searchParam);
+      }
+      
+      if (status && status !== 'all') {
+        whereClause += ' AND r.status = ?';
+        countWhereClause += ' AND r.status = ?';
+        params.push(status);
+        countParams.push(status);
+      }
+    }
+    
+    params.push(limit, offset);
     
     // Get total count
-    const [countResult] = await pool.execute(
-      'SELECT COUNT(*) as total FROM game_reports WHERE user_id = ?',
-      [req.user.id]
-    );
+    const [countResult] = await pool.execute(`
+      SELECT COUNT(*) as total 
+      FROM game_reports r
+      JOIN games g ON r.game_id = g.id
+      ${countWhereClause}
+    `, countParams);
     const total = countResult[0].total;
     
     // Get paginated data
@@ -752,10 +928,10 @@ app.get('/api/user/reports', authenticateToken, async (req, res) => {
       SELECT r.*, g.name as game_name
       FROM game_reports r
       JOIN games g ON r.game_id = g.id
-      WHERE r.user_id = ?
+      ${whereClause}
       ORDER BY r.created_at DESC
       LIMIT ? OFFSET ?
-    `, [req.user.id, limit, offset]);
+    `, params);
     
     res.json({
       data: reports,
@@ -774,7 +950,7 @@ app.get('/api/user/reports', authenticateToken, async (req, res) => {
 });
 
 // Dashboard stats
-app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const [totalUsers] = await pool.execute('SELECT COUNT(*) as count FROM users WHERE role = "user"');
     const [activeUsers] = await pool.execute('SELECT COUNT(*) as count FROM users WHERE role = "user" AND is_active = TRUE');
@@ -796,7 +972,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
-app.get('/api/user/categories', authenticateToken, async (req, res) => {
+app.get('/user/categories', authenticateToken, async (req, res) => {
   try {
     const [categories] = await pool.execute(
       'SELECT id, name, color, icon FROM game_categories WHERE is_active = TRUE ORDER BY sort_order ASC, name ASC'

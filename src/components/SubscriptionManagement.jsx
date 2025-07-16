@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, DollarSign, Calendar, ToggleLeft, ToggleRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Edit, Trash2, DollarSign, Calendar, ToggleLeft, ToggleRight, Search } from 'lucide-react';
 import axios from 'axios';
 import Pagination from './Pagination';
 
 const SubscriptionManagement = () => {
   const [plans, setPlans] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -25,13 +27,31 @@ const SubscriptionManagement = () => {
     is_active: true
   });
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchPlans();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearchTerm]);
 
   const fetchPlans = async () => {
     try {
-      const response = await axios.get(`/admin/subscription-plans?page=${currentPage}&limit=20`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20'
+      });
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+      
+      const response = await axios.get(`/admin/subscription-plans?${params}`);
       setPlans(response.data.data);
       setPagination(response.data.pagination);
     } catch (error) {
@@ -41,6 +61,11 @@ const SubscriptionManagement = () => {
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleEdit = (plan) => {
@@ -120,6 +145,18 @@ const SubscriptionManagement = () => {
           <Plus className="w-4 h-4" />
           <span>Tambah Paket</span>
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="flex items-center bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 focus-within:ring-2 focus-within:ring-purple-400/20 transition-all">
+        <Search className="w-4 h-4 text-gray-400 mr-2" />
+        <input
+          type="text"
+          placeholder="Cari paket berlangganan..."
+          value={searchTerm}
+          onChange={handleSearch}
+          className="w-full bg-transparent text-white placeholder-gray-400 focus:outline-none"
+        />
       </div>
 
       {/* Plans Grid */}

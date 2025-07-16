@@ -21,6 +21,7 @@ const UserDashboard = () => {
   const [games, setGames] = useState([]);
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [copiedTokens, setCopiedTokens] = useState({});
   const [loading, setLoading] = useState(true);
@@ -44,13 +45,40 @@ const UserDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchCategories();
   }, []);
 
+  // Initial data loading
   useEffect(() => {
-    fetchGames();
-  }, [currentPage]);
+    const loadInitialData = async () => {
+      setLoading(true);
+      try {
+        await fetchGames(true); // Pass true for initial load
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        setLoading(false);
+      }
+    };
+    
+    loadInitialData();
+  }, []); // Only run once on mount
+
+  // Handle subsequent data fetching (search, pagination, filters)
+  useEffect(() => {
+    if (!loading) { // Only fetch if not in initial loading state
+      fetchGames();
+    }
+  }, [currentPage, debouncedSearchTerm, selectedCategory]);
 
   const fetchCategories = async () => {
     try {
@@ -61,27 +89,49 @@ const UserDashboard = () => {
     }
   };
 
-  const fetchGames = async () => {
+  const fetchGames = async (isInitialLoad = false) => {
     try {
-      const response = await axios.get(
-        `/user/games?page=${currentPage}&limit=20`
-      );
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20'
+      });
+      
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+      
+      if (selectedCategory) {
+        params.append('category', selectedCategory);
+      }
+      
+      const response = await axios.get(`/user/games?${params}`);
       setGames(response.data.data);
       setPagination(response.data.pagination);
-    } catch (error) {
-      if (error.response?.status === 403) {
-        // Subscription expired
-        navigate("/");
-      } else {
-        console.error("Error fetching games:", error);
+      
+      // Only set loading to false for initial load
+      if (isInitialLoad) {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching games:', error);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleCategoryFilter = (e) => {
+    setSelectedCategory(e.target.value);
+    setCurrentPage(1); // Reset to first page when filtering
   };
 
   const handleCopyToken = async (gameId) => {
@@ -137,16 +187,7 @@ const UserDashboard = () => {
 
   const remainingDays = getRemainingDays();
 
-  // Filtered games by search and category
-  const filteredGames = games.filter((game) => {
-    const matchesSearch = game.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory
-      ? game.category_name === selectedCategory
-      : true;
-    return matchesSearch && matchesCategory;
-  });
+
 
   if (loading) {
     return (
@@ -271,7 +312,7 @@ const UserDashboard = () => {
               type="text"
               placeholder="Cari game..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearch}
               className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
             />
             <GamepadIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -279,7 +320,7 @@ const UserDashboard = () => {
           <div>
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={handleCategoryFilter}
               className="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
             >
               <option value="">Semua Kategori</option>
@@ -302,7 +343,7 @@ const UserDashboard = () => {
 
         {/* Games Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredGames.map((game) => (
+          {games.map((game) => (
             <div
               key={game.id}
               className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl overflow-hidden hover:bg-white/15 transition-all duration-300 transform hover:-translate-y-1"
@@ -401,16 +442,23 @@ const UserDashboard = () => {
               </span>
             </li>
             <li>Salin token untuk game yang ingin Anda mainkan</li>
-            <li>Tempel token pada kolom autentikasi di launcher</li>
-            <li>
-              Launcher akan mendekripsi token dan secara otomatis masuk ke game
-            </li>
+            <li>Buka aplikasi Steam</li>
+            <li>Buka Poorboy Gaming launcher & Tempel token pada kolom Encrypted Token lalu klik "Login to Steam"</li>
+            <li>Buka aplikasi Steam lagi dan tunggu Launcher mendekripsi token dan secara otomatis masuk ke game</li>
             <li>Selamat bermain!</li>
           </ol>
+          
+          <div className="mt-6 p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+            <h4 className="font-semibold text-yellow-300 mb-2">NOTE:</h4>
+            <ul className="list-disc list-inside space-y-1 text-yellow-200 text-sm">
+              <li>Selalu klik "Change Account" jangan "Sign Out" di Steam ketika ingin ganti game</li>
+              <li>Apabila ketika login butuh kode OTP bisa hubungi admin via whatsapp (Hanya perlu minta sekali, selanjutnya cukup change account)</li>
+            </ul>
+          </div>
         </div>
 
         {/* Empty State */}
-        {filteredGames.length === 0 && !loading && (
+        {games.length === 0 && !loading && (
           <div className="text-center py-12">
             <GamepadIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-300 mb-2">
