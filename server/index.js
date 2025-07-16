@@ -168,6 +168,30 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
+// Token validation endpoint
+app.get('/auth/validate', authenticateToken, async (req, res) => {
+  try {
+    // Check if user subscription is still valid
+    const [users] = await pool.execute(
+      'SELECT subscription_expiry FROM users WHERE id = ? AND is_active = TRUE',
+      [req.user.id]
+    );
+
+    if (users.length === 0) {
+      return res.status(401).json({ error: 'User not found or inactive' });
+    }
+
+    const user = users[0];
+    if (user.subscription_expiry && new Date(user.subscription_expiry) <= new Date()) {
+      return res.status(403).json({ error: 'Subscription expired' });
+    }
+
+    res.json({ valid: true, message: 'Token is valid' });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Subscription plans routes
 app.get('/subscription-plans', async (req, res) => {
   try {

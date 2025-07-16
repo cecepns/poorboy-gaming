@@ -12,6 +12,7 @@ import AdminReportManagement from './components/AdminReportManagement';
 import AdminSubscriptionManagement from './components/AdminSubscriptionManagement';
 import UserDashboard from './components/UserDashboard';
 import UserReports from './components/UserReports';
+import Notification from './components/Notification';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Protected Route Component
@@ -66,11 +67,21 @@ function Navigation() {
 
 // App Routes Component
 function AppRoutes() {
-  const { user } = useAuth();
+  const { user, notification, closeNotification } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <Navigation />
+      
+      {/* Global Notification */}
+      <Notification
+        type={notification.type}
+        message={notification.message}
+        isVisible={notification.isVisible}
+        onClose={closeNotification}
+        duration={5000}
+      />
+      
       <Routes>
         {/* Public Routes */}
         <Route 
