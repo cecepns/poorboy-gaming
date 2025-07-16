@@ -457,11 +457,11 @@ app.get('/admin/games', authenticateToken, requireAdmin, async (req, res) => {
 
 app.post('/admin/games', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, image_url, username, password, category_id } = req.body;
+    const { name, image_url, username, password, category_id, description } = req.body;
     
     await pool.execute(
-      'INSERT INTO games (name, image_url, username, password, category_id) VALUES (?, ?, ?, ?, ?)',
-      [name, image_url, username, password, category_id || null]
+      'INSERT INTO games (name, image_url, username, password, category_id, description) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, image_url, username, password, category_id || null, description || null]
     );
 
     res.status(201).json({ message: 'Game added successfully' });
@@ -473,11 +473,11 @@ app.post('/admin/games', authenticateToken, requireAdmin, async (req, res) => {
 app.put('/admin/games/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, image_url, username, password, category_id } = req.body;
+    const { name, image_url, username, password, category_id, description } = req.body;
     
     await pool.execute(
-      'UPDATE games SET name = ?, image_url = ?, username = ?, password = ?, category_id = ? WHERE id = ?',
-      [name, image_url, username, password, category_id || null, id]
+      'UPDATE games SET name = ?, image_url = ?, username = ?, password = ?, category_id = ?, description = ? WHERE id = ?',
+      [name, image_url, username, password, category_id || null, description || null, id]
     );
 
     res.json({ message: 'Game updated successfully' });
@@ -772,7 +772,7 @@ app.get('/user/games', authenticateToken, async (req, res) => {
     
     // Get paginated data with category info
     const [games] = await pool.execute(
-      `SELECT g.id, g.name, g.image_url, c.name as category_name, c.color as category_color
+      `SELECT g.id, g.name, g.image_url, g.description, c.name as category_name, c.color as category_color
        FROM games g
        LEFT JOIN game_categories c ON g.category_id = c.id
        ${whereClause}

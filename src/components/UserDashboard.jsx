@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   MessageSquare,
   Tag,
+  FileText,
+  X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
@@ -27,6 +29,8 @@ const UserDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [selectedGameForDescription, setSelectedGameForDescription] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -156,6 +160,11 @@ const UserDashboard = () => {
   const handleReportGame = (game) => {
     setSelectedGame(game);
     setShowReportModal(true);
+  };
+
+  const handleShowDescription = (game) => {
+    setSelectedGameForDescription(game);
+    setShowDescriptionModal(true);
   };
 
   const handleReportSubmitted = () => {
@@ -386,7 +395,7 @@ const UserDashboard = () => {
               </div>
 
               <div className="p-4">
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 mb-3">
                   <button
                     onClick={() => handleCopyToken(game.id)}
                     disabled={isSubscriptionExpired}
@@ -413,6 +422,16 @@ const UserDashboard = () => {
                     <span className="text-sm">Laporkan</span>
                   </button>
                 </div>
+                {game.description && (
+                  <button
+                    onClick={() => handleShowDescription(game)}
+                    disabled={isSubscriptionExpired}
+                    className="w-full flex items-center justify-center space-x-2 p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span className="text-sm">Lihat Deskripsi</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -479,6 +498,74 @@ const UserDashboard = () => {
           onClose={() => setShowReportModal(false)}
           onReportSubmitted={handleReportSubmitted}
         />
+      )}
+
+      {/* Description Modal */}
+      {showDescriptionModal && selectedGameForDescription && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-2xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-white">
+                Deskripsi Game: {selectedGameForDescription.name}
+              </h3>
+              <button
+                onClick={() => setShowDescriptionModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {selectedGameForDescription.image_url && (
+                <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden">
+                  <img
+                    src={selectedGameForDescription.image_url}
+                    alt={selectedGameForDescription.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+              
+              <div className="bg-white/10 border border-white/20 rounded-lg p-6">
+                <h4 className="text-lg font-semibold text-white mb-3 flex items-center">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Deskripsi & Catatan
+                </h4>
+                <div className="text-gray-200 whitespace-pre-wrap">
+                  {selectedGameForDescription.description}
+                </div>
+              </div>
+              
+              {selectedGameForDescription.category_name && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-400">Kategori:</span>
+                  <span 
+                    className="px-3 py-1 rounded-full text-sm font-medium"
+                    style={{ 
+                      backgroundColor: `${selectedGameForDescription.category_color}20`,
+                      color: selectedGameForDescription.category_color
+                    }}
+                  >
+                    {selectedGameForDescription.category_name}
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowDescriptionModal(false)}
+                className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Notification */}

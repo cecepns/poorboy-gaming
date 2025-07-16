@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Search, GamepadIcon, Image, User, Lock, Tag, ChevronDown, X, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, GamepadIcon, Image, User, Lock, Tag, ChevronDown, X, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import Pagination from './Pagination';
 
@@ -151,7 +151,8 @@ const GameManagement = ({ onStatsUpdate }) => {
     image_url: '',
     username: '',
     password: '',
-    category_id: ''
+    category_id: '',
+    description: ''
   });
   const [showPassword, setShowPassword] = useState(false);
 
@@ -217,7 +218,8 @@ const GameManagement = ({ onStatsUpdate }) => {
       image_url: game.image_url,
       username: game.username,
       password: game.password,
-      category_id: game.category_id ? game.category_id.toString() : ''
+      category_id: game.category_id ? game.category_id.toString() : '',
+      description: game.description || ''
     });
     setShowModal(true);
   };
@@ -263,7 +265,8 @@ const GameManagement = ({ onStatsUpdate }) => {
       image_url: '',
       username: '',
       password: '',
-      category_id: ''
+      category_id: '',
+      description: ''
     });
   };
 
@@ -434,6 +437,21 @@ const GameManagement = ({ onStatsUpdate }) => {
                     />
                   </div>
                 )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-200 mb-2">
+                  <MessageSquare className="w-4 h-4 inline mr-1" />
+                  Deskripsi / Catatan Game
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all"
+                  placeholder="Masukkan deskripsi atau catatan tentang game ini (opsional)"
+                  rows="4"
+                  disabled={loading}
+                />
               </div>
               
               <div>
